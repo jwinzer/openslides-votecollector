@@ -3,9 +3,9 @@ OPEN ISSUES:
 1. Openslides needs to provide some plugin hooks into agenda and motions.
 
 Currently, I replace the following openslides files with the ones provided in this package:
-	agenda/static/js/agenda/site.js
-	agenda/static/templates/agenda/item-detail.html
-	motions/static/js/motions/site.js
+agenda/static/js/agenda/site.js
+agenda/static/templates/agenda/item-detail.html
+motions/static/js/motions/site.js
 
 Search for "FIXME JW" in those files to find the currently provided hooks.
 
@@ -24,5 +24,7 @@ Search for "FIXME JW" in those files to find the currently provided hooks.
 8. Review setup.py
 
 Search for TODO to find all the open issues in the source code
+
+http://files.softwein.de/votecollector-dev.zip
 
 JW, 2016-09-29
