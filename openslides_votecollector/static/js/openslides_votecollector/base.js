@@ -1,4 +1,4 @@
-(function() {
+(function () {
 
 'use strict';
 
@@ -7,7 +7,7 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
 .factory('Keypad', [
     'DS',
     'jsDataModel',
-    function(DS, jsDataModel) {
+    function (DS, jsDataModel) {
         var name = 'openslides_votecollector/keypad',
             powerLevel = ['', 'full', 'medium', 'low', 'empty'],
             powerClass = ['none', 'success', 'success', 'warning', 'danger'];
@@ -17,25 +17,25 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
             useClass: jsDataModel,
             computed: {
                 // No websocket update on computed!
-                active: function() {
+                active: function () {
                     return this.isActive();
                 },
-                identified: function() {
+                identified: function () {
                     return this.isIdentified();
                 }
             },
             methods: {
-                getTitle: function() {
+                getTitle: function () {
                     return "Keypad " + this.keypad_id;
                 },
-                isActive: function() {
+                isActive: function () {
                     // TODO: inactive if not present?
                     return this.user === undefined || this.user.is_active;
                 },
-                isIdentified: function() {
+                isIdentified: function () {
                     return this.user !== undefined;
                 },
-                getSeatNumber: function() {
+                getSeatNumber: function () {
                     if (this.seat !== undefined) {
                         return this.seat.number;
                     }
@@ -43,10 +43,10 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
                         return '-';
                     }
                 },
-                power: function() {
+                power: function () {
                     return powerLevel[this.battery_level + 1];
                 },
-                powerClass: function() {
+                powerClass: function () {
                     return powerClass[this.battery_level + 1]
                 }
             },
@@ -68,7 +68,7 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
 
 .factory('Seat', [
     'DS',
-    function(DS) {
+    function (DS) {
         return DS.defineResource({
             name: 'openslides_votecollector/seat'
         });
@@ -79,21 +79,21 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
     '$http',
     '$timeout',
     'gettext',
-    function($http, $timeout, gettext) {
+    function ($http, $timeout, gettext) {
         var scope,
             poll_id = 0,
             is_voting = false;
 
-        var getVotingStatus = function() {
+        var getVotingStatus = function () {
             $http.get('/votecollector/status_yna/' + poll_id + '/').then(
                 function (success) {
                     if (success.data.error) {
-                        scope.alert = {type: 'danger', msg: success.data.error, show: true};
+                        scope.$parent.$parent.$parent.alert = {type: 'danger', msg: success.data.error, show: true};
                         scope.cannot_poll = true;
                         scope.status = '';
                     }
                     else {
-                        scope.alert = {};
+                        scope.$parent.$parent.$parent.alert = {};
                         scope.cannot_poll = false;
                         is_voting = success.data.is_polling;
                         if (is_voting) {
@@ -114,28 +114,28 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
         };
 
         return {
-            setup: function($scope) {
+            setup: function ($scope) {
                 scope = $scope;
-                poll_id = scope.model.id;
+                poll_id = scope.$parent.$parent.model.id;
                 getVotingStatus();
             },
-            isVoting: function() {
+            isVoting: function () {
                 return is_voting;
             },
-            start: function() {
+            start: function () {
                 // Must clear DS model.
-                scope.model.yes = null;
-                scope.model.no = null;
-                scope.model.abstain = null;
-                scope.model.votesvalid = null;
-                scope.model.votesinvalid = null;
-                scope.model.votescast = null;
+                scope.$parent.$parent.model.yes = null;
+                scope.$parent.$parent.model.no = null;
+                scope.$parent.$parent.model.abstain = null;
+                scope.$parent.$parent.model.votesvalid = null;
+                scope.$parent.$parent.model.votesinvalid = null;
+                scope.$parent.$parent.model.votescast = null;
                 scope.status = 'Voting is starting...'
-                scope.alert = {};
+                scope.$parent.$parent.$parent.alert = {};
                 $http.get('/votecollector/start_yna/' + poll_id + '/').then(
-                    function(success) {
+                    function (success) {
                         if (success.data.error) {
-                            scope.alert = { type: 'danger', msg: success.data.error, show: true };
+                            scope.$parent.$parent.$parent.alert = { type: 'danger', msg: success.data.error, show: true };
                             scope.status = gettext('No connection to VoteCollector.')
                         }
                         else {
@@ -145,39 +145,39 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
                             getVotingStatus();
                         }
                     },
-                    function(failure) {
-                        scope.alert = { type: 'danger', msg: failure.status + ': ' + failure.statusText, show: true };
+                    function (failure) {
+                        scope.$parent.$parent.$parent.alert = { type: 'danger', msg: failure.status + ': ' + failure.statusText, show: true };
                         scope.status = gettext('No connection to VoteCollector.')
                     }
                 );
             },
-            stop: function() {
+            stop: function () {
                 $http.get('/votecollector/stop_yna/' + poll_id + '/').then(
-                    function(success) {
+                    function (success) {
                         if (success.data.error) {
-                            scope.alert = { type: 'danger', msg: success.data.error, show: true };
+                            scope.$parent.$parent.$parent.alert = { type: 'danger', msg: success.data.error, show: true };
                         }
                         else {
                             is_voting = false;
                             scope.command = gettext('Start voting');
 
                             $http.get('/votecollector/result_yna/' + poll_id + '/').then(
-                                function(success) {
+                                function (success) {
                                     if (success.data.error) {
-                                        scope.alert = { type: 'danger', msg: success.data.error, show: true };
+                                        scope.$parent.$parent.$parent.alert = { type: 'danger', msg: success.data.error, show: true };
                                     }
                                     else {
                                         // update DS model.
-                                        scope.model.yes = success.data.yes;
-                                        scope.model.no = success.data.no;
-                                        scope.model.abstain = success.data.abstain;
-                                        scope.model.votesvalid = success.data.voted;
-                                        scope.model.votesinvalid = 0;
-                                        scope.model.votescast = success.data.voted;
+                                        scope.$parent.$parent.model.yes = success.data.yes;
+                                        scope.$parent.$parent.model.no = success.data.no;
+                                        scope.$parent.$parent.model.abstain = success.data.abstain;
+                                        scope.$parent.$parent.model.votesvalid = success.data.voted;
+                                        scope.$parent.$parent.model.votesinvalid = 0;
+                                        scope.$parent.$parent.model.votescast = success.data.voted;
 
                                         // notify user
                                         var message = gettext('Voting has ended. Do you want to save the result?');
-                                        scope.alert = { type: 'info', msg: gettext(message), show: true };
+                                        scope.$parent.$parent.$parent.alert = { type: 'info', msg: gettext(message), show: true };
                                         scope.status = scope.status.split('. ')[1];
                                     }
                                 }
@@ -194,27 +194,28 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
     '$http',
     '$timeout',
     'gettext',
-    function($http, $timeout, gettext) {
+    function ($http, $timeout, gettext) {
         var scope,
             item_id = 0,
             is_active = false;
 
-        var getVotingStatus = function() {
+        var getVotingStatus = function () {
             $http.get('/votecollector/status_speaker_list/' + item_id + '/').then (
-                function(success) {
+                function (success) {
                     if (success.data.error) {
                         scope.collectStatus = success.data.error;
                     }
                     else {
                         is_active = success.data.is_polling;
+                        scope.collectStatus = '';
                         if (is_active) {
                             scope.collectCommand = gettext('Stop speaker registration');
-                            scope.collectStatus = gettext('Active...');
+                            // scope.collectStatus = gettext('Active...');
                             $timeout(getVotingStatus, 1000);
                         }
                         else {
                             scope.collectCommand = gettext('Start speaker registration');
-                            scope.collectStatus = '';
+                            // scope.collectStatus = '';
                         }
                     }
                 }
@@ -222,17 +223,17 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
         };
 
         return {
-            setup: function(id, $scope) {
+            setup: function (id, $scope) {
                 item_id = id;
                 scope = $scope;
                 getVotingStatus();
 
                // Get live speaker list status from server.
             },
-            toggle: function() {
+            toggle: function () {
                 if (is_active) {
                     $http.get('/votecollector/stop_speaker_list/' + item_id + '/').then(
-                        function(success) {
+                        function (success) {
                             if (success.data.error) {
                                 scope.collectStatus = success.data.error;
                             }
@@ -245,7 +246,7 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
                 }
                 else {
                     $http.get('/votecollector/start_speaker_list/' + item_id + '/').then(
-                        function(success) {
+                        function (success) {
                             if (success.data.error) {
                                 scope.collectStatus = success.data.error;
                             }
@@ -254,8 +255,10 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
                                 getVotingStatus();
                             }
                         },
-                        function(failure) {
-                            scope.alert = { type: 'danger', msg: failure.status + ': ' + failure.statusText, show: true };
+                        function (failure) {
+                            // TODO: alert
+
+                            // scope.$parent.$parent.$parent.alert = { type: 'danger', msg: failure.status + ': ' + failure.statusText, show: true };
                         }
                     );
                 }
@@ -264,6 +267,6 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
     }
 ])
 
-.run(['Keypad', 'Seat', function(Keypad, Seat) {}]);
+.run(['Keypad', 'Seat', function (Keypad, Seat) {}]);
 
 }());
