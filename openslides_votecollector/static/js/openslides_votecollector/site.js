@@ -251,6 +251,37 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
                 }
             );
         };
+
+        // Generate seating plan with empty seats
+        $scope.seatingPlan = {};
+        //~ max_x_axis = seats.aggregate(Max('seating_plan_x_axis'))['seating_plan_x_axis__max']
+        //~ max_y_axis = seats.aggregate(Max('seating_plan_y_axis'))['seating_plan_y_axis__max']
+        //TODO calc max x and y axis
+        var maxXAxis = 20, maxYAxis = 8;
+        $scope.seatingPlan.rows = _.map(_.range(maxYAxis), function () {
+            return _.map(_.range(maxXAxis), function () {
+                return {};
+            });
+        });
+        angular.forEach(Seat.getAll(), function (seat) {
+            $scope.seatingPlan.rows[seat.seating_plan_y_axis-1][seat.seating_plan_x_axis-1] = {
+                'css': 'seat',
+                'number': seat.number,
+                'id': seat.id
+            };
+        });
+
+        $scope.changeSeat = function (seat, result) {
+            seat.number = result;
+            // Inject the changed seat object back into DS store.
+            Seat.inject(seat);
+            // Save change seat object on server.
+            Seat.save(seat).then(
+                function (success) {},
+                function (error) {}
+            );
+        }
+
     }
 ])
 
