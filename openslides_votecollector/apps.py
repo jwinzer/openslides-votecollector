@@ -21,7 +21,6 @@ class VoteCollectorAppConfig(AppConfig):
         # from . import projector  # noqa
 
         # Import all required stuff.
-        from django.db.models.signals import pre_delete, post_save
         from openslides.core.config import config
         from openslides.core.signals import post_permission_creation
         from openslides.utils.rest_api import router
@@ -45,7 +44,6 @@ class VoteCollectorAppConfig(AppConfig):
             add_default_seating_plan,
             dispatch_uid='votecollector_add_default_seating_plan'
         )
-        # TODO: add projector overlay signal
 
         # Register viewsets.
         router.register(self.get_model('Seat').get_collection_string(), SeatViewSet)

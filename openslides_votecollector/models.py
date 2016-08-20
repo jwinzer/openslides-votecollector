@@ -41,7 +41,7 @@ class Seat(RESTModelMixin, models.Model):
         """
         Ensures that a non empty seat number is unique.
 
-        Attention: This method is not uses by save() or bulk_create().
+        Attention: This method is not used by save() or bulk_create().
         """
         if self.number != '':
             queryset = self.objects.filter(number=self.number)
@@ -60,7 +60,7 @@ class Keypad(RESTModelMixin, models.Model):
     user = models.OneToOneField(User, null=True, blank=True)
     keypad_id = models.IntegerField(unique=True)
     seat = models.OneToOneField(Seat, null=True, blank=True)
-    battery_level = models.SmallIntegerField(default=-1)  # -1 = unknown
+    battery_level = models.SmallIntegerField(default=-1)  # -1 = unknown # TODO Remove this redundant db field.
     in_range = models.BooleanField(default=False)
 
     class Meta:
