@@ -46,6 +46,19 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
                 }
             }
         })
+        .state('openslides_votecollector.motionpoll', {
+            abstract: true,
+            template: "<ui-view/>",
+        })
+        .state('openslides_votecollector.motionpoll.detail', {
+            url: '/motionpoll/:id',
+            controller: 'MotionPollDetailCtrl',
+            resolve: {
+                motions: function (Motion) {
+                    return Motion.findAll();
+                }
+            }
+        })
     }
 ])
 
@@ -350,6 +363,8 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
     }
 ])
 
+
+// VotingCtrl at template hook motionPollFormButtons
 .run([
     'templateHooks',
     function (templateHooks) {
@@ -380,6 +395,46 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
     }
 ])
 
+
+// Button at template hook motionPollFormButtons
+.run([
+    'templateHooks',
+    function (templateHooks) {
+        templateHooks.registerHook({
+            Id: 'motionPollFormButtons',
+            template: '<div class="spacer"><p>' +
+                      '<a ui-sref="openslides_votecollector.motionpoll.detail({id: 1})" ' +
+                      'ng-click="closeThisDialog()">' +
+                      '<button class="btn btn-default" translate>Details</button>' +
+                      '</a></p></div>'
+        })
+    }
+])
+
+.controller('MotionPollDetailCtrl', [
+    '$scope',
+    '$stateParams',
+    'motions',
+    function ($scope, $stateParams, motions) {
+        // Find motion and poll from URL parameter (via $stateparams).
+        var i = -1;
+        while (++i < motions.length && !$scope.poll) {
+            $scope.poll = _.find(
+                motions[i].polls,
+                function (poll) {
+                    return poll.id == $stateParams.id
+                }
+            );
+            if ($scope.poll) {
+                $scope.motion = motions[i];
+            }
+        }
+
+    }
+])
+
+
+//SpeakerListCtrl at template hook itemDetailListOfSpeakersButtons
 .run([
     'templateHooks',
     function (templateHooks) {

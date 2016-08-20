@@ -69,11 +69,11 @@ class AjaxView(utils_views.View):
 
 
 class SeatViewSet(ModelViewSet):
-    access_permissions = SeatAccessPermissions
+    access_permissions = SeatAccessPermissions()
     queryset = Seat.objects.all()
 
     def check_view_permissions(self):
-        return self.request.user.has_perm('openslides_votecollector.can_manage_votecollector')
+        return self.get_access_permissions().can_retrieve(self.request.user)
 
 
 class KeypadViewSet(ModelViewSet):
@@ -81,7 +81,7 @@ class KeypadViewSet(ModelViewSet):
     queryset = Keypad.objects.all()
 
     def check_view_permissions(self):
-        return self.request.user.has_perm('openslides_votecollector.can_manage_votecollector')
+        return self.get_access_permissions().can_retrieve(self.request.user)
 
 
 class VotingView(AjaxView):
