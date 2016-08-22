@@ -56,7 +56,21 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
             resolve: {
                 motions: function (Motion) {
                     return Motion.findAll();
-                }
+                },
+                motionpollkeypadconnections: ['$q', 'MotionPollKeypadConnection', 'Keypad', function ($q, MotionPollKeypadConnection, Keypad) {
+                    // Load all MotionPollKeypadConnection objects and also respective Keypad and Seat objects.
+                    return MotionPollKeypadConnection.findAll().then(function (motionpollkeypadconnections) {
+                        var promises = motionpollkeypadconnections.map(function (motionpollkeypadconnection) {
+                            return MotionPollKeypadConnection.loadRelations(motionpollkeypadconnection, 'keypad').then(function (motionpollkeypadconnection) {
+                                return Keypad.loadRelations(motionpollkeypadconnection.keypad_id, 'seat');
+                            });
+                        });
+                        return $q.all(promises).then(function () {
+                            return motionpollkeypadconnections;
+                        });
+                    });
+
+                }]
             }
         })
     }
@@ -414,15 +428,19 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
 .controller('MotionPollDetailCtrl', [
     '$scope',
     '$stateParams',
+    'User',
+    'Keypad',
+    'Seat',
     'motions',
-    function ($scope, $stateParams, motions) {
+    'motionpollkeypadconnections',
+    function ($scope, $stateParams, User, Keypad, Seat, motions, motionpollkeypadconnections) {
         // Find motion and poll from URL parameter (via $stateparams).
         var i = -1;
         while (++i < motions.length && !$scope.poll) {
             $scope.poll = _.find(
                 motions[i].polls,
                 function (poll) {
-                    return poll.id == $stateParams.id
+                    return poll.id == $stateParams.id;
                 }
             );
             if ($scope.poll) {
@@ -430,6 +448,28 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
             }
         }
 
+        // Create table for single votes
+        $scope.votesList = motionpollkeypadconnections.map(
+            function (motionpollkeypadconnection) {
+                if (motionpollkeypadconnection.poll_id == $scope.poll.id) {
+                    var keypad = Keypad.get(motionpollkeypadconnection.keypad_id);
+                    var user = null
+                    if (keypad.user_id) {
+                        user = User.get(keypad.user_id);
+                    }
+                    var seat = null;
+                    if (keypad.seat_id) {
+                        seat = Seat.get(keypad.seat_id);
+                    }
+                    return {
+                        motionpollkeypadconnection: motionpollkeypadconnection,
+                        keypad: keypad,
+                        user: user,
+                        seat: seat
+                    };
+                }
+            }
+        );
     }
 ])
 

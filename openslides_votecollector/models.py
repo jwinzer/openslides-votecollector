@@ -7,7 +7,11 @@ from openslides.motions.models import MotionPoll
 from openslides.users.models import User
 from openslides.utils.models import RESTModelMixin
 
-from .access_permissions import KeypadAccessPermissions, SeatAccessPermissions
+from .access_permissions import (
+    KeypadAccessPermissions,
+    MotionPollKeypadConnectionAccessPermissions,
+    SeatAccessPermissions,
+)
 
 
 KEYPAD_MAP = ({
@@ -80,6 +84,8 @@ class MotionPollKeypadConnection(RESTModelMixin, models.Model):
     """
     Model to connect a poll of a motion with a keypad per personal voting.
     """
+    access_permissions = MotionPollKeypadConnectionAccessPermissions()
+
     poll = models.ForeignKey(MotionPoll, related_name='keypad_data_list')
     keypad = models.ForeignKey(Keypad, null=True)
     value = models.CharField(max_length=255)
@@ -102,9 +108,3 @@ class MotionPollKeypadConnection(RESTModelMixin, models.Model):
             return 'grey'
         else:
             return KEYPAD_MAP[self.value][1]
-
-    def get_root_rest_element(self):
-        """
-        Returns the motion to this instance which is the root REST element.
-        """
-        return self.poll.motion

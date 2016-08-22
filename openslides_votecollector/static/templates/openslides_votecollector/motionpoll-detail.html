@@ -20,14 +20,11 @@
 </div>
 
 <div class="details">
-    Yes: {{ poll.yes }}
-    No: {{ poll.no }}
-    Abstain: {{ poll.abstain }}
-    Votes valid: {{ poll.votesvalid }}
-    Votes invalid: {{ poll.votesinvalid }}
-    Votes cast: {{ poll.votescast }}
+    Yes: {{ poll.yes }} | No: {{ poll.no }} | Abstain: {{ poll.abstain }} | Votes valid: {{ poll.votesvalid }} | Votes invalid: {{ poll.votesinvalid }} | Votes cast: {{ poll.votescast }}
 </div>
 
 <div class="details">
-    All votes here with name, keypad, seat, votes without seats, ...
+    <p ng-repeat="item in votesList">
+        {{ item.user.get_short_name() }} | {{ item.user.structure_level }} | {{ item.motionpollkeypadconnection.serial_number }} | {{ item.seat.number }} | {{ item.motionpollkeypadconnection.value }}
+    </p>
 </div>

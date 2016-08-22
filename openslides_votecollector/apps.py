@@ -30,7 +30,7 @@ class VoteCollectorAppConfig(AppConfig):
             add_permissions_to_builtin_groups
         )
         from .urls import urlpatterns
-        from .views import KeypadViewSet, SeatViewSet
+        from .views import KeypadViewSet, MotionPollKeypadConnectionViewSet, SeatViewSet
 
         # Define config variables
         config.update_config_variables(get_config_variables())
@@ -48,6 +48,7 @@ class VoteCollectorAppConfig(AppConfig):
         # Register viewsets.
         router.register(self.get_model('Seat').get_collection_string(), SeatViewSet)
         router.register(self.get_model('Keypad').get_collection_string(), KeypadViewSet)
+        router.register(self.get_model('MotionPollKeypadConnection').get_collection_string(), MotionPollKeypadConnectionViewSet)
 
         # Provide plugin urlpatterns to application configuration
         self.urlpatterns = urlpatterns
