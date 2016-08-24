@@ -33,32 +33,3 @@ def add_default_seating_plan(**kwargs):
         # Do nothing if there are seats in the database
         return
     setup_default_plan()
-
-
-# TODO: projector overlay message
-# @receiver(projector_overlays, dispatch_uid='votecollector_overlay_message')
-# def overlay_message(sender, **kwargs):
-#     """
-#     Adds an overlay to show the votecollector message in non live voting mode.
-#     """
-#     def get_projector_html():
-#         """
-#         Returns the html for the votecollector message on the projector.
-#         """
-#         if config['votecollector_in_vote']:
-#             key_yes = "<span class='nobr'><img src='/static/img/button-yes.png'> %s</span>" % _('Yes')
-#             key_no = "<span class='nobr'><img src='/static/img/button-no.png'> %s</span>" % _('No')
-#             key_abstention = "<span class='nobr'><img src='/static/img/button-abstention.png'> %s</span>" % _('Abstention')
-#             message = "%s <br> %s &nbsp; %s &nbsp; %s " % (
-#                 config['votecollector_vote_started_msg'],
-#                 key_yes, key_no, key_abstention)
-#             value = render_to_string('openslides_votecollector/overlay_votecollector_projector.html', {'message': message})
-#         else:
-#             value = None
-#         return value
-#
-#     return Overlay(
-#         name='votecollector_message',
-#         get_widget_html=None,
-#         get_projector_html=get_projector_html,
-#         allways_active=True)

@@ -1,6 +1,24 @@
 from openslides.utils.rest_api import ModelSerializer, RelatedField
 
-from .models import Keypad, Seat
+from .models import VoteCollector, Keypad, Seat
+
+
+class VoteCollectorSerializer(ModelSerializer):
+    """
+    Serializer for openslides_votecollector.models.VoteCollector object.
+    """
+    class Meta:
+        model = VoteCollector
+        fields = (
+            'id',
+            'device_status',
+            'voting_mode',
+            'voting_target',
+            'voting_duration',
+            'voters_count',
+            'votes_received',
+            'is_voting',
+        )
 
 
 class KeypadSerializer(ModelSerializer):

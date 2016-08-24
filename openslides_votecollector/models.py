@@ -7,13 +7,39 @@ from openslides.motions.models import MotionPoll
 from openslides.users.models import User
 from openslides.utils.models import RESTModelMixin
 
-from .access_permissions import KeypadAccessPermissions
+from .access_permissions import VoteCollectorAccessPermissions, SeatAccessPermissions, KeypadAccessPermissions
 
 
 KEYPAD_MAP = ({
     'Y': (ugettext_noop('Yes'), 'green'),
     'N': (ugettext_noop('No'), 'red'),
     'A': (ugettext_noop('Abstention'), 'yellow')})
+
+
+class VoteCollector(RESTModelMixin, models.Model):
+    """
+    VoteCollector model. Provides device and voting status information.
+
+    Currently only one votecollector is supported (pk=1).
+    """
+    access_permissions = VoteCollectorAccessPermissions
+
+    device_status = models.CharField(max_length=200, default='No device')
+    voting_mode = models.CharField(max_length=50, null=True)
+    voting_target = models.IntegerField(default=0)
+    voting_duration = models.IntegerField(default=0)
+    voters_count = models.IntegerField(default=0)
+    votes_received = models.IntegerField(default=0)
+    is_voting = models.BooleanField(default=False)
+
+    class Meta:
+        default_permissions = ()
+        permissions = (
+            ('can_manage_votecollector', 'Can manage VoteCollector'),
+        )
+
+    def __str__(self):
+        return self.device_status
 
 
 class Seat(RESTModelMixin, models.Model):
@@ -23,7 +49,7 @@ class Seat(RESTModelMixin, models.Model):
 
     The seats are ordered according to their order in the database table.
     """
-    access_permissions = KeypadAccessPermissions
+    access_permissions = SeatAccessPermissions
 
     number = models.CharField(max_length=255)
     seating_plan_x_axis = models.PositiveIntegerField()
