@@ -12,7 +12,7 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
     function (mainMenuProvider, gettext) {
         mainMenuProvider.register({
             'ui_sref': 'openslides_votecollector.keypad.list',
-            'img_class': 'wifi',  // FIXME: use VC icon
+            'img_class': 'wifi',
             'title': gettext('VoteCollector'),
             'weight': 700,
             'perm': 'openslides_votecollector.can_manage_votecollector',
@@ -188,7 +188,7 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
         };
         // open new range dialog
         $scope.openRangeDialog = function () {
-            // TODO: ngDialog.open(KeypadRangeForm.getDialog());
+            // TODO: Implement open range form
         }
 
 
@@ -435,14 +435,11 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
         // TODO: Show voting duration.
 
         $scope.startVoting = function (poll) {
-            $scope.alert = {};
+            $scope.$parent.$parent.$parent.alert = {};
             // TODO: Render form inputs readonly.
-            $scope.$parent.$parent.model.yes = null;
-            $scope.$parent.$parent.model.no = null;
-            $scope.$parent.$parent.model.abstain = null;
-            $scope.$parent.$parent.model.votesvalid = 0;
-            $scope.$parent.$parent.model.votesinvalid = 0;
-            $scope.$parent.$parent.model.votescast = 0;
+            // Clear votes, clearing form inputs.
+            poll.yes = poll.no = poll.abstain = null;
+            poll.votesvalid = poll.votesinvalid = poll.votescast = null;
             $http.get('/votecollector/start_yna/' + poll.id + '/').then(
                 function (success) {
                     if (success.data.error) {
@@ -459,7 +456,7 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
         };
 
         $scope.stopVoting = function (poll) {
-            $scope.alert = {};
+            $scope.$parent.$parent.$parent.alert = {};
             $http.get('/votecollector/stop/').then(
                 function (success) {
                     if (success.data.error) {
@@ -474,18 +471,18 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
                                         msg: success.data.error, show: true };
                                 }
                                 else {
-                                    // Store result in DS model.
-                                    $scope.$parent.$parent.model.yes = success.data.yes;
-                                    $scope.$parent.$parent.model.no = success.data.no;
-                                    $scope.$parent.$parent.model.abstain = success.data.abstain;
-                                    $scope.$parent.$parent.model.votesvalid = $scope.vc.votes_received;
-                                    $scope.$parent.$parent.model.votesinvalid = 0;
-                                    $scope.$parent.$parent.model.votescast = $scope.vc.votes_received;
+                                    // Store result in DS model; updates form inputs.
+                                    poll.yes = success.data.votes[0];
+                                    poll.no = success.data.votes[1];
+                                    poll.abstain = success.data.votes[2];
+                                    poll.votesvalid = $scope.vc.votes_received;
+                                    poll.votesinvalid = 0;
+                                    poll.votescast = $scope.vc.votes_received;
 
                                     // Prompt user to save result.
                                     $scope.$parent.$parent.$parent.alert = {
                                         type: 'info',
-                                        msg: gettextCatalog.getString('The voting was finished.') + ' ' +
+                                        msg: gettextCatalog.getString('Voting has finished.') + ' ' +
                                              gettextCatalog.getString('Received votes:') + ' ' +
                                              $scope.vc.votes_received + ' / ' + $scope.vc.voters_count + '. ' +
                                              gettextCatalog.getString('Save this result now!'),
@@ -532,6 +529,119 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
             }
             return isProjected;
         }
+    }
+])
+
+.controller('ElectionCtrl', [
+    '$scope',
+    '$http',
+    'gettextCatalog',
+    'VoteCollector',
+    function ($scope, $http, gettextCatalog, VoteCollector) {
+        VoteCollector.find(1);
+        VoteCollector.bindOne(1, $scope, 'vc');
+
+        // TODO: Show voting duration.
+
+        // FIXME: Prevent deleting a poll while voting is active
+
+        $scope.startElection = function (poll) {
+            $scope.$parent.$parent.$parent.alert = {};
+
+            // TODO: Render form inputs readonly.
+
+            // Clear votes, clearing form inputs.
+            if (poll.yesnoabstain) {
+                poll.yes = null;
+                poll.no = null;
+                poll.abstain = null;
+            }
+            else {
+                for (var i = 0; i < poll.options.length; i++) {
+                    poll['vote_' + poll.options[i].candidate_id] = null;
+                }
+            }
+            poll.votesvalid = null;
+            poll.votesinvalid = null;
+            poll.votescast = null;
+
+            // Start votecollector.
+            var url = '/votecollector/start_election/' + poll.id + '/' + poll.options.length + '/';
+            if (poll.yesnoabstain) {
+                url = '/votecollector/start_election_one/' + poll.id + '/';
+            }
+            $http.get(url).then(
+                function (success) {
+                    if (success.data.error) {
+                        $scope.$parent.$parent.$parent.alert = { type: 'danger', msg: success.data.error, show: true };
+                    }
+                },
+                function (failure) {
+                    $scope.$parent.$parent.$parent.alert = {
+                        type: 'danger',
+                        msg: $scope.vc.getErrorMessage(failure.status, failure.statusText),
+                        show: true };
+                }
+            );
+        };
+
+        $scope.stopElection = function (poll) {
+            $scope.$parent.$parent.$parent.alert = {};
+
+            // Stop votecollector.
+            $http.get('/votecollector/stop/').then(
+                function (success) {
+                    if (success.data.error) {
+                        $scope.$parent.$parent.$parent.alert = { type: 'danger',
+                            msg: success.data.error, show: true };
+                    }
+                    else {
+                        // Get votecollector result.
+                        $http.get('/votecollector/result_election/' + poll.id + '/').then(
+                            function (success) {
+                                if (success.data.error) {
+                                    $scope.$parent.$parent.$parent.alert = { type: 'danger',
+                                        msg: success.data.error, show: true };
+                                }
+                                else {
+                                    // Store result in DS model, updates form inputs.
+                                    if (poll.yesnoabstain) {
+                                        var id = poll.options[0].candidate_id;
+                                        poll['yes_' + id] = success.data.votes[0];
+                                        poll['no_' + id] = success.data.votes[1];
+                                        poll['abstain_' + id] = success.data.votes[2];
+                                    }
+                                    else {
+                                        for (var i = 0; i < poll.options.length; i++) {
+                                            poll['vote_' + poll.options[i].candidate_id] = success.data.votes[i]
+                                        }
+                                    }
+                                    poll.votesvalid = $scope.vc.votes_received;
+                                    poll.votesinvalid = 0;
+                                    poll.votescast = $scope.vc.votes_received;
+
+                                    // Prompt user to save result.
+                                    $scope.$parent.$parent.$parent.alert = {
+                                        type: 'info',
+                                        msg: gettextCatalog.getString('Voting has finished.') + ' ' +
+                                             gettextCatalog.getString('Received votes:') + ' ' +
+                                             $scope.vc.votes_received + ' / ' + $scope.vc.voters_count + '. ' +
+                                             gettextCatalog.getString('Save this result now!'),
+                                        show: true
+                                    };
+                                }
+                            }
+                        );
+                    }
+                },
+                function (failure) {
+                    $scope.$parent.$parent.$parent.alert = {
+                        type: 'danger',
+                        msg: $scope.vc.getErrorMessage(failure.status, failure.statusText),
+                        show: true };
+                }
+            );
+        };
     }
 ])
 
@@ -604,6 +714,30 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
                       '<i class="fa fa-video-camera"></i> ' +
                       '<translate>Vote<translate></button>' +
                     '<p>{{ vc.getVotingStatus($parent.$parent.model) }}</p>' +
+                '</div>'
+        })
+    }
+])
+
+// ElectionCtrl at template hook assignmentPollFormButtons
+.run([
+    'templateHooks',
+    function (templateHooks) {
+        templateHooks.registerHook({
+            Id: 'assignmentPollFormButtons',
+            template:
+                '<div ng-controller="ElectionCtrl" class="spacer">' +
+                    '<button type="button" ng-if="vc.canStartElection($parent.$parent.model)" ' +
+                        'ng-click="startElection($parent.$parent.model)"' +
+                        'class="btn btn-default">' +
+                        '<i class="fa fa-wifi" aria-hidden="true"></i> '+
+                        '<translate>Start voting</translate></button> ' +
+                    '<button type="button" ng-if="vc.canStopElection($parent.$parent.model)" ' +
+                        'ng-click="stopElection($parent.$parent.model)"' +
+                        'class="btn btn-primary">' +
+                        '<i class="fa fa-wifi" aria-hidden="true"></i> '+
+                        '<translate>Stop voting<translate></button> ' +
+                    '<p>{{ vc.getElectionStatus($parent.$parent.model) }}</p>' +
                 '</div>'
         })
     }

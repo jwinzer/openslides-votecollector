@@ -1,10 +1,12 @@
 import json
 
+from django.apps import apps
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.utils.translation import ugettext as _
 
 from openslides.agenda.models import Item, Speaker
+from openslides.assignments.models import AssignmentPoll
 from openslides.core.config import config
 from openslides.core.exceptions import OpenSlidesError
 from openslides.core.models import Projector
@@ -131,22 +133,18 @@ class VotingView(AjaxView):
         else:
             return 'http://%s%s' % (host, self.resource_path)
 
-    def get_poll_or_item(self):
+    def get_poll_object(self):
         obj = None
         self.error = None
-        poll_id = self.kwargs.get('poll_id')
-        if poll_id:
+        app_label = self.kwargs.get('app')
+        model_name = self.kwargs.get('model')
+        model_id = self.kwargs.get('id')
+        if app_label and model_name and model_id:
+            model = apps.get_model(app_label, model_name)
             try:
-                obj = MotionPoll.objects.get(id=poll_id)
-            except MotionPoll.DoesNotExist:
-                self.error = _('Unknown poll.')
-        else:
-            item_id = self.kwargs.get('item_id')
-            if item_id:
-                try:
-                    obj = Item.objects.get(id=self.kwargs['item_id'])
-                except Item.DoesNotExist:
-                    self.error = _('Unknown item.')
+                obj = model.objects.get(id=model_id)
+            except model.DoesNotExist:
+                self.error = _('Unknown id.')
         return obj
 
     def get_ajax_context(self, **kwargs):
@@ -187,8 +185,8 @@ class StartVoting(VotingView):
     def get(self, request, *args, **kwargs):
         mode = kwargs['mode']
         resource = kwargs['resource']
-        obj = self.get_poll_or_item()
-        vc, created = VoteCollector.objects.get_or_create(id=1)
+        obj = self.get_poll_object()
+        vc = VoteCollector.objects.get(id=1)
         if not self.error:
             # Stop any active voting no matter what mode.
             if vc.is_voting:
@@ -201,11 +199,11 @@ class StartVoting(VotingView):
             if target:
                 url += str(target)
             try:
-                self.result = start_voting(mode, url)
+                self.result = start_voting(mode, kwargs.get('options'), url)
             except VoteCollectorError as e:
                 self.error = e.value
             else:
-                vc.voting_mode = mode
+                vc.voting_mode = kwargs.get('model', 'Test')
                 vc.voting_target = target
                 vc.voters_count = self.result
                 vc.votes_received = 0
@@ -220,11 +218,17 @@ class StartVoting(VotingView):
     def no_error_context(self):
         return {'count': self.result}
 
+    @staticmethod
+    def clear_votes(poll):
+        if poll.has_votes():
+            poll.get_votes().delete()
+            poll.votescast = poll.votesinvalid = poll.votesvalid = None
+            poll.save()
+
 
 class StartYNA(StartVoting):
     def on_start(self, poll):
-        # Clear poll results.
-        poll.get_votes().delete()
+        self.clear_votes(poll)
 
         # Show voting prompt on projector.
         projector = Projector.objects.get(id=1)
@@ -235,6 +239,21 @@ class StartYNA(StartVoting):
                 "<span class='nobr'><img src='/static/img/button-yes.png'> <translate>Yes</translate></span> &nbsp; " +
                 "<span class='nobr'><img src='/static/img/button-no.png'> <translate>No</translate></span> &nbsp; " +
                 "<span class='nobr'><img src='/static/img/button-abstain.png'> <translate>Abstain</translate></span>",
+            'visible': True,
+            'stable': True
+        }
+        projector.save()
+
+
+class StartElection(StartVoting):
+    def on_start(self, poll):
+        self.clear_votes(poll)
+
+        # Show voting prompt on projector.
+        projector = Projector.objects.get(id=1)
+        projector.config[self.voting_key] = {
+            'name': 'voting/prompt',
+            'message': config['votecollector_vote_started_msg'],
             'visible': True,
             'stable': True
         }
@@ -289,7 +308,7 @@ class StopVoting(VotingView):
 
 class VotingStatus(VotingView):
     def get(self, request, *args, **kwargs):
-        obj = self.get_poll_or_item()
+        obj = self.get_poll_object()
         if not self.error:
             try:
                 self.result = get_voting_status()
@@ -305,66 +324,106 @@ class VotingStatus(VotingView):
         }
 
 
-class ResultYNA(VotingView):
+class VotingResult(VotingView):
     def get(self, request, *args, **kwargs):
-        poll = self.get_poll_or_item()
-        if not self.error:
-            vc = VoteCollector.objects.get(id=1)
-            if vc.voting_mode == 'YesNoAbstain' and vc.voting_target == poll.id:
-                try:
-                    self.result = get_voting_result()
-                except VoteCollectorError as e:
-                    self.error = e.value
-            else:
-                self.error = _('Another voting is active.')
-        return super(ResultYNA, self).get(request, *args, **kwargs)
+        self.error = None
+        vc = VoteCollector.objects.get(id=1)
+        if vc.voting_mode == kwargs['model'] and vc.voting_target == int(kwargs['id']):
+            try:
+                self.result = get_voting_result()
+            except VoteCollectorError as e:
+                self.error = e.value
+        else:
+            self.error = _('Another voting is active.')
+        return super(VotingResult, self).get(request, *args, **kwargs)
 
     def no_error_context(self):
         return {
-            'yes': self.result[0],
-            'no': self.result[1],
-            'abstain': self.result[2],
-            'not_voted': self.result[3]
+            'votes': self.result
         }
 
 
 class VotingCallbackView(utils_views.View):
     http_method_names = ['post']
 
+    def post(self, request, poll_id, keypad_id):
+        # TODO: validate REMOTE_HOST to be VoteCollector or use other authentication method
+
+        # Get keypad.
+        try:
+            keypad = Keypad.objects.get(keypad_id=keypad_id)
+        except Keypad.DoesNotExist:
+            return None
+
+        # Mark keypad as in range and update battery level.
+        keypad.in_range = True
+        keypad.battery_level = request.POST.get('battery', -1)
+        keypad.save()
+        return keypad
+
 
 class VoteCallback(VotingCallbackView):
     def post(self, request, poll_id, keypad_id):
-        # TODO: validate REMOTE_HOST to be VoteCollector or use other authentication method
+        keypad = super(VoteCallback, self).post(request, poll_id, keypad_id)
+        if keypad is None:
+            return HttpResponse(_('Vote rejected'))
 
         # TODO: Use transaction here.
 
         # Validate vote value.
         value = request.POST.get('value')
         if value not in ('Y', 'N', 'A'):
-            return HttpResponse()
-
-        # Get motion poll.
-        try:
-            poll = MotionPoll.objects.get(id=poll_id)
-        except MotionPoll.DoesNotExist:
-            return HttpResponse()
-
-        # Get keypad.
-        try:
-            keypad = Keypad.objects.get(keypad_id=keypad_id)
-        except Keypad.DoesNotExist:
-            return HttpResponse()
-
-        # Mark keypad as in range and update battery level.
-        keypad.in_range = True
-        keypad.battery_level = request.POST.get('battery', -1)
-        keypad.save()
+            return HttpResponse(_('Vote invalid'))
 
         # Save vote.
-        conn, created = MotionPollKeypadConnection.objects.get_or_create(poll=poll, keypad=keypad)
-        conn.value = value
-        conn.serial_number = request.POST.get('sn')
-        conn.save()
+        vc = VoteCollector.objects.get(id=1)
+        if vc.voting_mode == 'MotionPoll':
+            try:
+                poll = MotionPoll.objects.get(id=poll_id)
+            except MotionPoll.DoesNotExist:
+                return HttpResponse(_('Vote rejected'))
+
+            conn, created = MotionPollKeypadConnection.objects.get_or_create(poll=poll, keypad=keypad)
+            conn.value = value
+            conn.serial_number = request.POST.get('sn')
+            conn.save()
+        # TODO: save vote for assignment poll
+
+        # Update votecollector.
+        vc.votes_received = request.POST.get('votes', 0)
+        vc.voting_duration = request.POST.get('elapsed', 0)
+        vc.save()
+
+        return HttpResponse(_('Vote received'))
+
+
+class CandidateCallback(VotingCallbackView):
+    def post(self, request, poll_id, keypad_id):
+        keypad = super(CandidateCallback, self).post(request, poll_id, keypad_id)
+        if keypad is None:
+            return HttpResponse(_('Vote rejected'))
+
+        # TODO: Use transaction here.
+
+        # Get assignment poll.
+        try:
+            poll = AssignmentPoll.objects.get(id=poll_id)
+        except AssignmentPoll.DoesNotExist:
+            return HttpResponse(_('Vote rejected'))
+
+        # Validate vote value.
+        try:
+            value = int(request.POST.get('value'))
+        except ValueError:
+            return HttpResponse(_('Vote invalid'))
+        if value < 1 or value > poll.options.count():
+            return HttpResponse(_('Vote invalid'))
+
+        # TODO: Save vote.
+        # conn, created = MotionPollKeypadConnection.objects.get_or_create(poll=poll, keypad=keypad)
+        # conn.value = value
+        # conn.serial_number = request.POST.get('sn')
+        # conn.save()
 
         # Update votecollector.
         vc = VoteCollector.objects.get(id=1)
@@ -372,36 +431,28 @@ class VoteCallback(VotingCallbackView):
         vc.voting_duration = request.POST.get('elapsed', 0)
         vc.save()
 
-        return HttpResponse()
+        # Return name of elected candidate.
+        # TODO: Check candidate order. Must match keypad value.
+        return HttpResponse(poll.options.all()[value - 1].candidate.last_name)
 
 
 class SpeakerCallback(VotingCallbackView):
-
     def post(self, request, item_id, keypad_id):
-        # TODO: validate REMOTE_HOST to be VoteCollector or use other authentication method
+        keypad = super(SpeakerCallback, self).post(request, item_id, keypad_id)
+        if keypad is None:
+            return HttpResponse(_('Not registered'))
+
+        # Anonymous users cannot be added or removed from the speaker list.
+        if keypad.user is None:
+            return HttpResponse(_('Unknown'))
 
         # Get agenda item.
         try:
             item = Item.objects.get(id=item_id)
         except MotionPoll.DoesNotExist:
-            return HttpResponse()
+            return HttpResponse(_('No agenda'))
 
         # TODO: use timestamp to prioritize speakers
-
-        # Get keypad.
-        try:
-            keypad = Keypad.objects.get(keypad_id=keypad_id)
-        except Keypad.DoesNotExist:
-            return HttpResponse(_('Not registered'))
-
-        # Mark keypad as in range and update battery level.
-        keypad.in_range = True
-        keypad.battery_level = request.POST.get('battery', -1)
-        keypad.save()
-
-        # Anonymous users cannot be added or removed from the speaker list.
-        if keypad.user is None:
-            return HttpResponse(_('Unknown'))
 
         # Add keypad user to the speaker list.
         value = request.POST.get('value')
@@ -412,30 +463,18 @@ class SpeakerCallback(VotingCallbackView):
             except OpenSlidesError:
                 # User is already on the speaker list.
                 pass
-            content = _('Speaking')
+            content = _('Speaking')  # TODO: review keypad message
         # Remove keypad user from the speaker list.
         elif value == 'N':
             # Remove speaker if on "next speakers" list (begin_time=None, end_time=None).
             Speaker.objects.filter(user=keypad.user, item=item, begin_time=None, end_time=None).delete()
-            content = _('Not speaking')
+            content = _('Not speaking')  # TODO: review keypad message
         else:
             content = _('Invalid')
         return HttpResponse(content)
 
 
 class KeypadCallback(VotingCallbackView):
-
-    def post(self, request, keypad_id):
-        # TODO: validate REMOTE_HOST to be VoteCollector or use other authentication method
-
-        # Get keypad.
-        try:
-            keypad = Keypad.objects.get(keypad_id=keypad_id)
-        except Keypad.DoesNotExist:
-            return HttpResponse()
-
-        # Mark keypad as in range and update battery level.
-        keypad.in_range = True
-        keypad.battery_level = request.POST.get('battery', -1)
-        keypad.save()
+    def post(self, request, poll_id=0, keypad_id=0):
+        super(KeypadCallback, self).post(request, poll_id, keypad_id)
         return HttpResponse()

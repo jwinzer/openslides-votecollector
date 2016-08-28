@@ -74,7 +74,7 @@ class Seat(RESTModelMixin, models.Model):
 
         Attention: This method is not used by save() or bulk_create().
         """
-        #TODO: Reactivate this method in SeatViewSet
+        # TODO: Reactivate this method in SeatViewSet
         if self.number != '':
             queryset = self.objects.filter(number=self.number)
             if self.pk is not None:
