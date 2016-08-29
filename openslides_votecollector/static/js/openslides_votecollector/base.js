@@ -16,70 +16,6 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
                         return gettext('VoteCollector not running!');
                     }
                     return status + ': ' + text;
-                },
-                canPing: function () {
-                    return !this.is_voting || this.voting_mode == 'Item';
-                },
-                canStartVoting: function (poll) {
-                    // TODO: Enable start button for YNA and SD while voting?
-                    return !this.is_voting || this.voting_mode == 'Item';
-                },
-                canStopVoting: function (poll) {
-                    return this.is_voting && this.voting_mode == 'MotionPoll' && this.voting_target == poll.id;
-                },
-                canStartElection: function (poll) {
-                    return !this.is_voting || this.voting_mode == 'Item';
-                },
-                canStopElection: function (poll) {
-                    return this.is_voting && this.voting_mode == 'AssignmentPoll' && this.voting_target == poll.id;
-                },
-                canStartSpeakerList: function (item) {
-                    return !this.is_voting || (this.voting_mode == 'Item' && this.voting_target != item.id);
-                },
-                canStopSpeakerList: function (item) {
-                    return this.is_voting && this.voting_mode == 'Item' && this.voting_target == item.id;
-                },
-                getVotingStatus: function (poll) {
-                    if (this.is_voting) {
-                        if (this.voting_mode == 'Ping') {
-                            return gettext('System test is runing.');
-                        }
-                        if (this.voting_mode == 'Item') {
-                            return gettext('Speaker list voting is active for item ' + this.voting_target + '.');
-                        }
-                        if (this.voting_mode == 'AssignmentPoll') {
-                            return gettext('Voting is active for election poll ' + this.voting_target + '.');
-                        }
-                        if (this.voting_mode == 'MotionPoll') {
-                            if (this.voting_target != poll.id) {
-                                return gettext('Voting is active for motion poll ' + this.voting_target + '.');
-                            }
-                            // TODO: translate
-                            return gettext('Votes received: ' + this.votes_received + ' of ' + this.voters_count);
-                        }
-                    }
-                    return '';
-                },
-                getElectionStatus: function (poll) {
-                    if (this.is_voting) {
-                        if (this.voting_mode == 'Ping') {
-                            return gettext('System test is runing.');
-                        }
-                        if (this.voting_mode == 'Item') {
-                            return gettext('Speaker list voting is active for item ' + this.voting_target + '.');
-                        }
-                        if (this.voting_mode == 'MotionPoll') {
-                            return gettext('Voting is active for motion poll ' + this.voting_target + '.');
-                        }
-                        if (this.voting_mode == 'AssignmentPoll') {
-                            if (this.voting_target != poll.id) {
-                                return gettext('Voting is active for election poll ' + this.voting_target + '.');
-                            }
-                            // TODO: translate
-                            return gettext('Votes received: ' + this.votes_received + ' of ' + this.voters_count);
-                        }
-                    }
-                    return '';
                 }
             }
         });
@@ -202,6 +138,39 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
     }
 ])
 
+.factory('AssignmentPollKeypadConnection', [
+    'DS',
+    function (DS) {
+        return DS.defineResource({
+            name: 'openslides_votecollector/assignmentpollkeypadconnection',
+        });
+    }
+])
+
+.factory('AssignmentPollFinder', [
+    function () {
+        return {
+            find: function (assignments, pollId) {
+                // Find assignment and poll from poll id.
+                var i = -1;
+                var result = {};
+                while (++i < assignments.length && !result.poll) {
+                    result.poll = _.find(
+                        assignments[i].polls,
+                        function (poll) {
+                            return poll.id == pollId;
+                        }
+                    );
+                    if (result.poll) {
+                        result.assignment = assignments[i];
+                    }
+                }
+                return result;
+            }
+        }
+    }
+])
+
 .factory('SeatingPlan', [
     function () {
         return {
@@ -236,7 +205,7 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
     }
 ])
 
-.run(['VoteCollector', 'Keypad', 'Seat', 'MotionPollKeypadConnection',
-    function (VoteCollector, Keypad, Seat, MotionPollKeypadConnection) {}]);
+.run(['VoteCollector', 'Keypad', 'Seat', 'MotionPollKeypadConnection', 'AssignmentPollKeypadConnection',
+    function (VoteCollector, Keypad, Seat, MotionPollKeypadConnection, AssignmentPollKeypadConnection) {}]);
 
 }());

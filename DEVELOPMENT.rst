@@ -1,17 +1,8 @@
 OPEN ISSUES:
 
-TODO OpenSlides:
-- Add AssignmentVote 'Abstaining votes' to AssignmentPoll for election with more than one candidate
-- Add <template-hook hook-name="assignmentPollFormButtons"></template-hook> to assignmentpoll-form.html#L14
+http://files.softwein.de/votecollector175.zip
 
-TODO JW:
-- Do we need to save assignment votes, i.e. create AssignmentPollKeypadConnection model?
 
-Search for FIXME and TODO to find all the open issues in the source code
-
-http://files.softwein.de/votecollector174.zip
-
-JW, 2016-08-28
 
 
 

@@ -6,7 +6,7 @@ from django.http import HttpResponse
 from django.utils.translation import ugettext as _
 
 from openslides.agenda.models import Item, Speaker
-from openslides.assignments.models import AssignmentPoll
+from openslides.assignments.models import AssignmentPoll, AssignmentRelatedUser
 from openslides.core.config import config
 from openslides.core.exceptions import OpenSlidesError
 from openslides.core.models import Projector
@@ -23,12 +23,13 @@ from .api import (
     VoteCollectorError
 )
 from .access_permissions import (
+    AssignmentPollKeypadConnectionAccessPermissions,
     KeypadAccessPermissions,
     MotionPollKeypadConnectionAccessPermissions,
     SeatAccessPermissions,
     VoteCollectorAccessPermissions,
 )
-from .models import Keypad, MotionPollKeypadConnection, Seat, VoteCollector
+from .models import AssignmentPollKeypadConnection, Keypad, MotionPollKeypadConnection, Seat, VoteCollector
 
 
 class AjaxView(utils_views.View):
@@ -116,6 +117,14 @@ class MotionPollKeypadConnectionViewSet(ReadOnlyModelViewSet):
         MotionPollKeypadConnection.objects.filter(poll_id=request.data.get('poll_id')).update(keypad=None)
         # TODO: Trigger autoupdate.
         return Response({'detail': _('All votes are successfully anonymized.')})
+
+
+class AssignmentPollKeypadConnectionViewSet(ReadOnlyModelViewSet):
+    access_permissions = AssignmentPollKeypadConnectionAccessPermissions()
+    queryset = AssignmentPollKeypadConnection.objects.all()
+
+    def check_view_permissions(self):
+        return self.get_access_permissions().can_retrieve(self.request.user)
 
 
 class VotingView(AjaxView):
@@ -229,6 +238,8 @@ class StartVoting(VotingView):
 class StartYNA(StartVoting):
     def on_start(self, poll):
         self.clear_votes(poll)
+        model = MotionPollKeypadConnection if type(poll) == MotionPoll else AssignmentPollKeypadConnection
+        model.objects.filter(poll=poll).delete()
 
         # Show voting prompt on projector.
         projector = Projector.objects.get(id=1)
@@ -248,6 +259,7 @@ class StartYNA(StartVoting):
 class StartElection(StartVoting):
     def on_start(self, poll):
         self.clear_votes(poll)
+        AssignmentPollKeypadConnection.objects.filter(poll=poll).delete()
 
         # Show voting prompt on projector.
         projector = Projector.objects.get(id=1)
@@ -326,15 +338,33 @@ class VotingStatus(VotingView):
 
 class VotingResult(VotingView):
     def get(self, request, *args, **kwargs):
-        self.error = None
-        vc = VoteCollector.objects.get(id=1)
-        if vc.voting_mode == kwargs['model'] and vc.voting_target == int(kwargs['id']):
-            try:
-                self.result = get_voting_result()
-            except VoteCollectorError as e:
-                self.error = e.value
-        else:
-            self.error = _('Another voting is active.')
+        poll = self.get_poll_object()
+        if not self.error:
+            vc = VoteCollector.objects.get(id=1)
+            if vc.voting_mode == kwargs['model'] and vc.voting_target == int(kwargs['id']):
+                if vc.voting_mode == 'AssignmentPoll' and not poll.yesnoabstain and not poll.yesno:
+                    # Calculate vote result.
+                    self.result = {
+                        'invalid': 0,
+                        'valid': 0
+                    }
+                    for option in poll.get_options().all():
+                        self.result['vote_' + str(option.candidate_id)] = 0
+                    for conn in AssignmentPollKeypadConnection.objects.filter(poll_id=vc.voting_target):
+                        key = 'vote_' + str(conn.candidate_id)
+                        if conn.candidate and key in self.result:
+                            self.result[key] += 1
+                            self.result['valid'] += 1
+                        else:
+                            self.result['invalid'] += 1
+                else:
+                    # Get vote result from votecollector.
+                    try:
+                        self.result = get_voting_result()
+                    except VoteCollectorError as e:
+                        self.error = e.value
+            else:
+                self.error = _('Another voting is active.')
         return super(VotingResult, self).get(request, *args, **kwargs)
 
     def no_error_context(self):
@@ -377,17 +407,20 @@ class VoteCallback(VotingCallbackView):
 
         # Save vote.
         vc = VoteCollector.objects.get(id=1)
-        if vc.voting_mode == 'MotionPoll':
-            try:
-                poll = MotionPoll.objects.get(id=poll_id)
-            except MotionPoll.DoesNotExist:
-                return HttpResponse(_('Vote rejected'))
+        model = MotionPoll if vc.voting_mode == 'MotionPoll' else AssignmentPoll
+        try:
+            poll = model.objects.get(id=poll_id)
+        except model.DoesNotExist:
+            return HttpResponse(_('Vote rejected'))
 
+        if vc.voting_mode == 'MotionPoll':
             conn, created = MotionPollKeypadConnection.objects.get_or_create(poll=poll, keypad=keypad)
-            conn.value = value
             conn.serial_number = request.POST.get('sn')
-            conn.save()
-        # TODO: save vote for assignment poll
+        else:
+            conn, created = AssignmentPollKeypadConnection.objects.get_or_create(
+                poll=poll, serial_number=request.POST.get('sn'))
+        conn.value = value
+        conn.save()
 
         # Update votecollector.
         vc.votes_received = request.POST.get('votes', 0)
@@ -413,17 +446,26 @@ class CandidateCallback(VotingCallbackView):
 
         # Validate vote value.
         try:
-            value = int(request.POST.get('value'))
+            key = int(request.POST.get('value'))
         except ValueError:
             return HttpResponse(_('Vote invalid'))
-        if value < 1 or value > poll.options.count():
+        if key < 0 or key > 9:
             return HttpResponse(_('Vote invalid'))
 
-        # TODO: Save vote.
-        # conn, created = MotionPollKeypadConnection.objects.get_or_create(poll=poll, keypad=keypad)
-        # conn.value = value
-        # conn.serial_number = request.POST.get('sn')
-        # conn.save()
+        # Get the elected candidate.
+        candidate = None
+        if key > 0 and key <= poll.assignment.related_users.all().count():
+            candidate = AssignmentRelatedUser.objects.order_by('id').filter(
+                assignment=poll.assignment).all()[key - 1].user
+            # NOTE: Must not use related_users since the ordering does not match the site ordering.
+            # candidate = poll.assignment.related_users.all()[key - 1]
+
+        # Save vote.
+        conn, created = AssignmentPollKeypadConnection.objects.get_or_create(
+            poll=poll, serial_number=request.POST.get('sn'))
+        conn.value = str(key)
+        conn.candidate = candidate
+        conn.save()
 
         # Update votecollector.
         vc = VoteCollector.objects.get(id=1)
@@ -431,28 +473,24 @@ class CandidateCallback(VotingCallbackView):
         vc.voting_duration = request.POST.get('elapsed', 0)
         vc.save()
 
-        # Return name of elected candidate.
-        # TODO: Check candidate order. Must match keypad value.
-        return HttpResponse(poll.options.all()[value - 1].candidate.last_name)
+        return HttpResponse(_('Vote received'))
 
 
 class SpeakerCallback(VotingCallbackView):
     def post(self, request, item_id, keypad_id):
         keypad = super(SpeakerCallback, self).post(request, item_id, keypad_id)
         if keypad is None:
-            return HttpResponse(_('Not registered'))
+            return HttpResponse(_('Keypad not registered'))
 
         # Anonymous users cannot be added or removed from the speaker list.
         if keypad.user is None:
-            return HttpResponse(_('Unknown'))
+            return HttpResponse(_('User unknown'))
 
         # Get agenda item.
         try:
             item = Item.objects.get(id=item_id)
         except MotionPoll.DoesNotExist:
-            return HttpResponse(_('No agenda'))
-
-        # TODO: use timestamp to prioritize speakers
+            return HttpResponse(_('No agenda item selected'))
 
         # Add keypad user to the speaker list.
         value = request.POST.get('value')
@@ -463,14 +501,14 @@ class SpeakerCallback(VotingCallbackView):
             except OpenSlidesError:
                 # User is already on the speaker list.
                 pass
-            content = _('Speaking')  # TODO: review keypad message
+            content = _('Added to list of speakers')
         # Remove keypad user from the speaker list.
         elif value == 'N':
             # Remove speaker if on "next speakers" list (begin_time=None, end_time=None).
             Speaker.objects.filter(user=keypad.user, item=item, begin_time=None, end_time=None).delete()
-            content = _('Not speaking')  # TODO: review keypad message
+            content = _('Removed from list of speakers')
         else:
-            content = _('Invalid')
+            content = _('Invalid entry')
         return HttpResponse(content)
 
 

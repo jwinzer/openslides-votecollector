@@ -61,12 +61,14 @@ urlpatterns = [
 
     url(r'^votecollector/result_yna/(?P<id>\d+)/$',
         views.VotingResult.as_view(), {
+            'app': 'motions',
             'model': 'MotionPoll'
         },
         name='votecollector_result_yna'),
 
     url(r'^votecollector/result_election/(?P<id>\d+)/$',
         views.VotingResult.as_view(), {
+            'app': 'assignments',
             'model': 'AssignmentPoll'
         },
         name='votecollector_result_election'),
