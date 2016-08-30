@@ -491,11 +491,11 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
         VoteCollector.bindOne(1, $scope, 'vc');
 
         $scope.canStartVoting = function () {
-            return !$scope.vc.is_voting || $scope.vc.voting_mode == 'Item';
+            return $scope.vc !== undefined && (!$scope.vc.is_voting || $scope.vc.voting_mode == 'Item');
         };
 
         $scope.canStopVoting = function () {
-            return $scope.vc.is_voting && $scope.vc.voting_mode == 'MotionPoll' &&
+            return $scope.vc !== undefined && $scope.vc.is_voting && $scope.vc.voting_mode == 'MotionPoll' &&
                 $scope.vc.voting_target == $scope.poll.id;
         };
 
@@ -638,11 +638,11 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
             var electionMethod = Config.get('assignments_poll_vote_values').value,
                 enabled = $scope.poll.assignment.open_posts == 1 && (
                     electionMethod == 'auto' || electionMethod == 'votes');
-            return enabled && (!$scope.vc.is_voting || $scope.vc.voting_mode == 'Item');
+            return enabled && $scope.vc !== undefined && (!$scope.vc.is_voting || $scope.vc.voting_mode == 'Item');
         };
 
         $scope.canStopVoting = function () {
-            return $scope.vc.is_voting && $scope.vc.voting_mode == 'AssignmentPoll' &&
+            return $scope.vc !== undefined && $scope.vc.is_voting && $scope.vc.voting_mode == 'AssignmentPoll' &&
                 $scope.vc.voting_target == $scope.poll.id;
         };
 
@@ -781,12 +781,13 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
         VoteCollector.bindOne(1, $scope, 'vc');
 
         $scope.canStartVoting = function () {
-            return !$scope.vc.is_voting || (
-                $scope.vc.voting_mode == 'Item' && $scope.vc.voting_target != $scope.item.id);
+            return $scope.vc !== undefined && (!$scope.vc.is_voting || (
+                $scope.vc.voting_mode == 'Item' && $scope.vc.voting_target != $scope.item.id));
         };
 
         $scope.canStopVoting = function () {
-            return $scope.vc.is_voting && $scope.vc.voting_mode == 'Item' && $scope.vc.voting_target == $scope.item.id;
+            return $scope.vc !== undefined && $scope.vc.is_voting && $scope.vc.voting_mode == 'Item' &&
+                $scope.vc.voting_target == $scope.item.id;
         };
 
         $scope.startVoting = function () {

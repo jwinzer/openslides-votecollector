@@ -48,7 +48,6 @@ angular.module('OpenSlidesApp.openslides_votecollector', ['OpenSlidesApp.users']
                     return "Keypad " + this.keypad_id;
                 },
                 isActive: function () {
-                    // TODO: inactive if not present?
                     return this.user === undefined || this.user.is_active;
                 },
                 isIdentified: function () {
