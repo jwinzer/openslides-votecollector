@@ -524,6 +524,7 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
         };
 
         $scope.stopVoting = function () {
+            // TODO: Clear seating plan (MotionPollKeypadConnections) if results are not saved after stop voting.
             $scope.$parent.$parent.$parent.alert = {};
             $http.get('/votecollector/stop/').then(
                 function (success) {
@@ -791,15 +792,15 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
         };
 
         $scope.startVoting = function () {
-            $scope.alert = {};
+            $scope.vcAlert = {};
             $http.get('/votecollector/start_speaker_list/' + $scope.item.id + '/').then(
                 function (success) {
                     if (success.data.error) {
-                        $scope.alert = { type: 'danger', msg: success.data.error, show: true };
+                        $scope.vcAlert = { type: 'danger', msg: success.data.error, show: true };
                     }
                 },
                 function (failure) {
-                    $scope.alert = {
+                    $scope.vcAlert = {
                         type: 'danger',
                         msg: $scope.vc.getErrorMessage(failure.status, failure.statusText),
                         show: true };
@@ -808,15 +809,15 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
         };
 
         $scope.stopVoting = function () {
-            $scope.alert = {};
+            $scope.vcAlert = {};
             $http.get('/votecollector/stop/').then(
                 function (success) {
                     if (success.data.error) {
-                        $scope.alert = { type: 'danger', msg: success.data.error, show: true };
+                        $scope.vcAlert = { type: 'danger', msg: success.data.error, show: true };
                     }
                 },
                 function (failure) {
-                    $scope.alert = {
+                    $scope.vcAlert = {
                         type: 'danger',
                         msg: $scope.vc.getErrorMessage(failure.status, failure.statusText),
                         show: true };
@@ -898,8 +899,8 @@ angular.module('OpenSlidesApp.openslides_votecollector.site', [
                         'class="btn btn-sm btn-primary">' +
                         '<i class="fa fa-wifi" aria-hidden="true"></i> '+
                         '<translate>Stop speakers voting</translate></button>' +
-                    '<uib-alert ng-show="alert.show" type="{{ alert.type }}" ng-click="alert={}" close="alert={}">' +
-                        '{{ alert.msg }}</uib-alert>' +
+                    '<uib-alert ng-show="vcAlert.show" type="{{ vcAlert.type }}" ng-click="vcAlert={}" close="vcAlert={}">' +
+                        '{{ vcAlert.msg }}</uib-alert>' +
                 '</div>'
         })
     }
