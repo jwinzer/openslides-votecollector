@@ -16,6 +16,12 @@ from openslides.utils import views as utils_views
 from openslides.utils.autoupdate import inform_deleted_data
 from openslides.utils.rest_api import ListModelMixin, ModelViewSet, PermissionMixin, RetrieveModelMixin, Response, list_route
 
+try:
+    # Proxy voting hook
+    from openslides_proxyvoting.voting import Ballot
+except ImportError:
+    Ballot = None
+
 from .api import (
     get_device_status,
     get_voting_result,
@@ -153,7 +159,7 @@ class VotingView(AjaxView):
         host = request.META['SERVER_NAME']
         port = request.META.get('SERVER_PORT', 0)
         if port:
-            return 'http://%s:%s%s' % (host, port, self.resource_path)
+            return 'http://%s:%d%s' % (host, port, self.resource_path)
         else:
             return 'http://%s%s' % (host, self.resource_path)
 
@@ -188,8 +194,7 @@ class VotingView(AjaxView):
         """
         return {}
 
-    @staticmethod
-    def clear_votes(poll):
+    def clear_votes(self, poll):
         # poll is MotionPoll or AssignmentPoll
         if poll.has_votes():
             poll.get_votes().delete()
@@ -205,7 +210,12 @@ class VotingView(AjaxView):
             args.append(pk)
         model.objects.filter(poll=poll).delete()
         # trigger autoupdate
-        inform_deleted_data(*args)
+        if args:
+            inform_deleted_data(*args)
+
+        if Ballot and type(poll) == MotionPoll:
+            ballot = Ballot(poll)
+            ballot.delete_ballots()
 
 
 class DeviceStatus(VotingView):
@@ -264,6 +274,9 @@ class StartVoting(VotingView):
 
 class StartYNA(StartVoting):
     def on_start(self, poll):
+        if type(poll) == MotionPoll and Ballot:
+            ballot = Ballot(poll)
+            ballot.create_absentee_ballots()
 
         # Get candidate name (if is an election with one candidate only)
         candidate_str = ''
@@ -406,6 +419,15 @@ class VotingResult(VotingView):
                             self.result['valid'] += 1
                         else:
                             self.result['invalid'] += 1
+                elif vc.voting_mode == 'MotionPoll' and Ballot:
+                    ballot = Ballot(poll)
+                    result = ballot.count_votes()
+                    print(result)
+                    self.result = [
+                        int(result['Y'][1]),
+                        int(result['N'][1]),
+                        int(result['A'][1])
+                    ]
                 else:
                     # Get vote result from votecollector.
                     try:
@@ -463,15 +485,23 @@ class VoteCallback(VotingCallbackView):
             return HttpResponse(_('Vote rejected'))
 
         if vc.voting_mode == 'MotionPoll':
-            try:
-                conn = MotionPollKeypadConnection.objects.get(poll=poll, keypad=keypad)
-            except MotionPollKeypadConnection.DoesNotExist:
-                conn = MotionPollKeypadConnection()
-                conn.poll = poll
-                conn.keypad = keypad
-            conn.serial_number = request.POST.get('sn')
-            conn.value = value
-            conn.save()
+            is_valid_keypad = 1
+            if Ballot:
+                ballot = Ballot(poll)
+                is_valid_keypad = ballot.register_vote(keypad_id, value) > 0
+            if is_valid_keypad:
+                try:
+                    conn = MotionPollKeypadConnection.objects.get(poll=poll, keypad=keypad)
+                except MotionPollKeypadConnection.DoesNotExist:
+                    conn = MotionPollKeypadConnection()
+                    conn.poll = poll
+                    conn.keypad = keypad
+                conn.serial_number = request.POST.get('sn')
+                conn.value = value
+                conn.save()
+            else:
+                return HttpResponse(_('Vote rejected'))
+
         else:
             try:
                 conn = AssignmentPollKeypadConnection.objects.get(poll=poll, keypad=keypad)
