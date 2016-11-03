@@ -49,7 +49,7 @@ def get_server():
     except TypeError:
         raise VoteCollectorError(_('Server not found.'))
 
-    # Test the connection
+    # TODO: Eliminate test the connection.
     try:
         server.voteCollector.getDeviceStatus()
     except:
@@ -59,7 +59,10 @@ def get_server():
 
 
 def get_keypads():
-    keypads = Keypad.objects.exclude(user__is_present=False).values_list(
+    # FIXME: Wohnbau
+    # keypads = Keypad.objects.exclude(user__is_present=False).values_list(
+    #     'keypad_id', flat=True).order_by('keypad_id')
+    keypads = Keypad.objects.values_list(
         'keypad_id', flat=True).order_by('keypad_id')
 
     if config['votecollector_method'] == 'anonym':

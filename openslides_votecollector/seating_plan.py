@@ -5,6 +5,28 @@ def setup_default_plan():
     """
     Adds a default seating plan.
     """
+    limit = 200
+    seats = []
+    number = 1
+    for row in range(1, 11):
+        for col in (1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20, 21, 22, 23,):
+            seats.append(Seat(
+                pk=number,
+                number=number,
+                seating_plan_x_axis=col,
+                seating_plan_y_axis=row
+            ))
+            number += 1
+            if number > limit:
+                break
+        if number > limit:
+            break
+
+    Seat.objects.bulk_create(seats)
+
+
+def setup_plan():
+
     seats = []
 
     # Podium

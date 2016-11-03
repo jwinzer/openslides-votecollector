@@ -87,6 +87,10 @@ urlpatterns = [
         },
         name='votecollector_result_election'),
 
+    url(r'^votecollector/vote/(?P<poll_id>\d+)/$',
+        csrf_exempt(views.Votes.as_view()),
+        name='votecollector_votes'),
+
     url(r'^votecollector/vote/(?P<poll_id>\d+)/(?P<keypad_id>\d+)/$',
         csrf_exempt(views.VoteCallback.as_view()),
         name='votecollector_vote'),
