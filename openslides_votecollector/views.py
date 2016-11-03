@@ -13,7 +13,7 @@ from openslides.core.exceptions import OpenSlidesError
 from openslides.core.models import Projector
 from openslides.motions.models import MotionPoll
 from openslides.utils import views as utils_views
-from openslides.utils.autoupdate import inform_deleted_data
+from openslides.utils.autoupdate import inform_changed_data, inform_deleted_data
 from openslides.utils.rest_api import ListModelMixin, ModelViewSet, PermissionMixin, RetrieveModelMixin, Response, list_route
 
 from .api import (
@@ -328,12 +328,9 @@ class StartSpeakerList(StartVoting):
 class StartPing(StartVoting):
     def on_start(self, obj):
         # Clear in_range and battery_level of all keypads.
-        # Attention: Cannot use Keypad.objects.all().update(in_range=False, battery_level=-1)
-        # since no post_save signals will be sent on update.
-        for keypad in Keypad.objects.all():
-            keypad.in_range = False
-            keypad.battery_level = -1
-            keypad.save()
+        Keypad.objects.all().update(in_range=False, battery_level=-1)
+        # Do not autoupdate. Client updates its own DS.
+        # inform_changed_data(Keypad.objects.all())
 
 
 class StopVoting(VotingView):
@@ -578,5 +575,7 @@ class SpeakerCallback(VotingCallbackView):
 
 class KeypadCallback(VotingCallbackView):
     def post(self, request, poll_id=0, keypad_id=0):
-        super(KeypadCallback, self).post(request, poll_id, keypad_id)
+        keypad = super(KeypadCallback, self).post(request, poll_id, keypad_id)
+        if keypad:
+            inform_changed_data(keypad)
         return HttpResponse()
