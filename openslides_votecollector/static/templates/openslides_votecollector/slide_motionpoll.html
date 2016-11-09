@@ -79,7 +79,7 @@
     <tr>
       <td><img src='/static/img/button-yes.png'>
       <td class="bold">
-        {{ poll.yes || liveVotes.yes }}
+        {{ (poll.yes || liveVotes.yes) | number:0 }}
       <td class="percentage">
         <div ng-if="poll.getVote(poll.yes, 'yes').percentNumber || !poll.has_votes">
           {{ poll.getVote(poll.yes, 'yes').percentStr || '&nbsp;' }}
@@ -91,7 +91,7 @@
     <tr>
       <td><img src='/static/img/button-no.png'>
       <td class="bold">
-        {{ poll.no || liveVotes.no }}
+        {{ (poll.no || liveVotes.no) | number:0 }}
       <td class="percentage">
         <div ng-if="poll.getVote(poll.no, 'no').percentNumber || !poll.has_votes">
           {{ poll.getVote(poll.no, 'no').percentStr || '&nbsp;' }}
@@ -103,7 +103,7 @@
     <tr>
       <td><img src='/static/img/button-abstain.png'>
       <td class="bold">
-        {{ poll.abstain || liveVotes.abstain }}
+        {{ (poll.abstain || liveVotes.abstain) | number:0 }}
       <td class="percentage">
         <div ng-if="poll.getVote(poll.abstain, 'abstain').percentNumber || !poll.has_votes">
           {{ poll.getVote(poll.abstain, 'abstain').percentStr || '&nbsp;'}}
@@ -115,7 +115,7 @@
     <tr class="total">
       <td>
       <td class="bold">
-        {{ poll.votesvalid || votes_received }}
+        {{ (poll.votesvalid || votes_received) | number:0 }}
       <td>
         {{ poll.getVote(poll.votesvalid, 'votesvalid').percentStr }}
   </table>

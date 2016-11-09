@@ -48,27 +48,27 @@
     <tr>
       <td><img src='/static/img/button-yes.png'> <translate>Yes</translate>
       <td class="bold">
-        {{ poll.getVote(poll.yes, 'yes').value }}
+        {{ poll.getVote(poll.yes, 'yes').value | number:0 }}
         {{ poll.getVote(poll.yes, 'yes').percentStr }}
     <!-- no -->
     <tr>
       <td><img src='/static/img/button-no.png'> <translate>No</translate>
       <td class="bold">
-        {{ poll.getVote(poll.no, 'no').value }}
+        {{ poll.getVote(poll.no, 'no').value | number:0 }}
         {{ poll.getVote(poll.yes, 'no').percentStr }}
 
     <!-- abstain -->
     <tr>
       <td><img src='/static/img/button-abstain.png'> <translate>Abstain</translate>
       <td class="bold">
-        {{ poll.getVote(poll.abstain, 'abstain').value }}
+        {{ poll.getVote(poll.abstain, 'abstain').value | number:0 }}
         {{ poll.getVote(poll.abstain, 'abstain').percentStr }}
 
     <!-- valid votes -->
     <tr>
       <td><translate>Valid votes</translate>
       <td class="bold">
-        {{ poll.getVote(poll.votesvalid, 'votesvalid').value }}
+        {{ poll.getVote(poll.votesvalid, 'votesvalid').value | number:0 }}
         {{ poll.getVote(poll.votesvalid, 'votesvalid').percentStr }}
   </table>
 
